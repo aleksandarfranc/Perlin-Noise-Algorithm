@@ -25,9 +25,9 @@ private:
 	float* fPerlinNoise1D = nullptr;
 	int nOutputSize = 256;
 
-	int nOctaveCount = 1;
+	int nOctaveCount = 6;
 	float fScalingBias = 2.0f;
-	int nMode = 1;
+	int nMode = 2;
 
 	virtual bool OnUserCreate() {
 		// 1D initializing
@@ -86,11 +86,11 @@ private:
 			if (m_keys[L'Z'].bReleased)
 				for (int i = 0; i < nOutputSize; i++) fNoiseSeed1D[i] = (float)rand() / float(RAND_MAX);
 
-			PerlinNoise1D(nOutputSize, fNoiseSeed1D, nOctaveCount, fScalingBias, fPerlinNoise1D); // svakog frame-a mi generisemo noise
+			PerlinNoise1D( fNoiseSeed1D,nOutputSize, nOctaveCount, fScalingBias, fPerlinNoise1D); // svakog frame-a mi generisemo noise
 			for (int x = 0; x < nOutputSize; x++) {
 
 				int y = - (fPerlinNoise1D[x] * (float)ScreenHeight()/2.0f) + (float)ScreenHeight()/2.0f; // '-' jer je (0,0) u koo sistemu gore levo
-				for (int f = y; f < ScreenHeight()/2; f++) // zasto?
+				for (int f = y; f < ScreenHeight()/2; f++) // zasto? crta ga od gore na dole. (0,0) je gore levo
 					Draw(x, f, PIXEL_SOLID, FG_GREEN);
 			}
 		}
@@ -100,14 +100,15 @@ private:
 			if (m_keys[L'Z'].bReleased)
 				for (int i = 0; i < nOutputHeight * nOutputWidth; i++)
 					fNoiseSeed2D[i] = (float)rand() / (float)RAND_MAX;
-			PerlinNoise2D(nOutputWidth, nOutputHeight, fNoiseSeed2D, nOctaveCount, fScalingBias, fPerlinNoise2D);
+			PerlinNoise2D( nOutputWidth, nOutputHeight,fNoiseSeed2D, nOctaveCount, fScalingBias, fPerlinNoise2D);
 
 			for (int x = 0; x < nOutputWidth; x++)
 				for (int y = 0; y < nOutputHeight; y++)
-				{	// this is code from webcam video
+				{	
 					short bg_col, fg_col;
 					wchar_t sym;
-					int pixel_bw = (int)(fPerlinNoise2D[y * nOutputWidth + x] * 12.0f);
+					float brisi = fPerlinNoise2D[y * nOutputWidth + x];
+					int pixel_bw = (int)(brisi * 12.0f);
 					switch (pixel_bw)
 					{
 					case 0: bg_col = BG_BLACK; fg_col = FG_BLACK; sym = PIXEL_SOLID; break;
@@ -181,70 +182,73 @@ private:
 		return true;
 	}
 
-	void PerlinNoise1D(int nCount, float* fSeed, int nOctaves, float fBias, float* fOutout) {
-		//fSeed[0] = 0.5;
-		for (int x = 0; x < nCount; x++) // why nCount
-		{
-			float fNoise = 0.0f;
-			float fScale = 1.0f;
-			float fScaleAcc = 0.0f;
+	void PerlinNoise1D(float* seed, int nWidth, int octave, float fBias, float* output) {
 
-			for (int o = 0; o < nOctaves; o++)
-			{
-				int nPitch = nCount >> o; // 256>>1=128,64,32,16,8,4,2;1
-				// x = 63, nPitch = 32,16,8,4,2,1 => nSample1 = 32,48,56,60,62,63
-				int nSample1 = (x / nPitch) * nPitch;
-				int nSample2 = (nSample1 + nPitch) % nCount;
-								
-				float fBlend = (float)(x - nSample1) / (float)nPitch; //offset izmedju 0 i 1. 
-				float fSample = (1.0f - fBlend) * fSeed[nSample1] + fBlend * fSeed[nSample2];
-				fNoise += fSample * fScale;
-
-				fScaleAcc += fScale;
-				fScale = fScale / fBias;
-			}
-
-			//
-			fOutout[x] = fNoise/fScaleAcc;
-		}
 		
-	}
 
-	void PerlinNoise2D(int nWidth,int nHeight, float* fSeed, int nOctaves, float fBias, float* fOutout) {
-		fSeed[1] = 0.5; // // ZASTO? Zasto sa 0.5 je sve pravo; a blize jedinici sve vertikalno ; blize 0 sve horizontalno. Probaj 0.9999 i 0.0001 i vidi
-		for (int x = 0; x < nWidth; x++) 
-			for(int y = 0; y < nHeight; y++)
-			{
-				float fNoise = 0.0f;
-				float fScale = 1.0f;
-				float fScaleAcc = 0.0f;
+		for (int i = 0; i < nWidth; i++) {
 
-				for (int o = 0; o < nOctaves; o++)
-				{
-					int nPitch = nWidth >> o;
-					int nSampleX1 = (x / nPitch) * nPitch;
-					int nSampleY1 = (y / nPitch) * nPitch;
+			float Noise = 0.0f;
+			float fScalling = 1.0f;
+			float ScallingSum = 0.0f;
 
-					int nSampleX2 = (nSampleX1 + nPitch) % nWidth;
-					int nSampleY2 = (nSampleY1 + nPitch) % nWidth;
+			for (int j = 0; j < octave; j++) {
+				int index = nWidth >> j;
 
-					float fBlendX = (float)(x - nSampleX1) / (float)nPitch; //offset ili ostatak koji je prikazan izmedju 0 i 1. 
-					float fBlendY = (float)(y - nSampleY1) / (float)nPitch; //offset ili ostatak koji je prikazan izmedju 0 i 1. 
+				int nLeft_Index_X = ((i / index) * index) % nWidth;
+				int rightIndex = (nLeft_Index_X + index) % nWidth;
 
-					float fSampleT = (1.0f - fBlendX) * fSeed[nSampleY1 * nWidth + nSampleX1] + fBlendX * fSeed[nSampleY1 * nWidth + nSampleX2];
-					float fSampleB = (1.0f - fBlendX) * fSeed[nSampleY2 * nWidth + nSampleX1] + fBlendX * fSeed[nSampleY2 * nWidth + nSampleX2];
+				float left = seed[nLeft_Index_X] * fScalling;
+				float right = seed[rightIndex] * fScalling;
 
-					fNoise += (fBlendY * (fSampleB - fSampleT) + fSampleT) * fScale; // jasno mi je sta je cilj ovde (izmedju xSampleova (T i B)...) ali kako smo dosli od toga
-					// SKONTAO SAMO NACRTAO SKICU
+				float offset = (float)(i - nLeft_Index_X) / (float)index;
 
-					fScaleAcc += fScale;
-					fScale = fScale / fBias;
-				}
+				Noise += left - (left - right) * offset;
 
-				fOutout[y*nWidth + x] = fNoise / fScaleAcc;
+				ScallingSum += fScalling;
+				fScalling /= fBias;
+
 			}
+			output[i] = Noise / ScallingSum;
+			fScalling = 1.0f;
+		}
 
 	}
+
+	void PerlinNoise2D( int nWidth, int nHeight, float* seed, int octave, float fBias, float* output) {
+		for (int i = 0; i < nWidth; i++) 
+			for (int j = 0; j < nHeight; j++) 
+			{
+				float Sample = 0.0f;
+				float SumScalling = 0.0f;
+				float scalling = 1.0f;
+				
+
+				for (int k = 0; k < octave; k++) 
+				{
+					int nIndexI = nWidth >> k;
+					int nLeft_Index_X = (i / nIndexI) * nIndexI % nWidth;
+					int nBack_Index_Y = (j / nIndexI) * nIndexI % nWidth;
+
+					int nRight_Index_X = (nLeft_Index_X + nIndexI) % nWidth;
+					int nFront_Index_Y = (nBack_Index_Y + nIndexI) % nWidth;
+
+					float offsetX = (float)(i - nLeft_Index_X) / (float)nIndexI;
+					float offsetY = (float)(j - nBack_Index_Y) / (float)nIndexI;
+					
+					float back = (1.0f - offsetX) * seed[nBack_Index_Y * nWidth + nLeft_Index_X] + offsetX * seed[nBack_Index_Y * nWidth + nRight_Index_X];
+					float front = (1.0f - offsetX) * seed[nFront_Index_Y * nWidth + nLeft_Index_X] + offsetX * seed[nFront_Index_Y * nWidth + nRight_Index_X];
+
+					SumScalling += scalling;
+					Sample +=  (offsetY *( front - back) + back) * scalling;
+					scalling = scalling / fBias;
+					
+				}
+				float f = Sample / SumScalling;
+				output[j * nWidth + i] = f;
+			}
+	}
+
 
 };
 
