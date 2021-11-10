@@ -1,5 +1,5 @@
 # Perlin-Noise
 Game Engine and cpp file
 
-Its about generation natural terrane from <br />
-randomly picked number that are the terrain seed.
+Generating natural terrain from <br />
+randomly picked numbers that are the terrain seed.
