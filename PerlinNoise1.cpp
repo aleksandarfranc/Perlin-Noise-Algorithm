@@ -49,12 +49,6 @@ private:
 		fNoiseSeed2D = new float[nOutputWidth * nOutputHeight];
 		fPerlinNoise2D = new float[nOutputWidth * nOutputHeight];
 
-
-		/*for(int x = 0; x < nOutputWidth; x++)
-			for (int y = 0; y < nOutputHeight; y++) {
-				fNoiseSeed2D[x * nOutputWidth + y] = (float) rand() / (float)RAND_MAX;
-			}*/
-
 		for(int i = 0 ; i < nOutputWidth * nOutputHeight; i++) fNoiseSeed2D[i] = (float)rand() / (float)RAND_MAX;
 
 		return true;
