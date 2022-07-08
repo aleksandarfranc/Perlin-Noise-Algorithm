@@ -1,4 +1,5 @@
 # Perlin-Noise
-Game Engine and cpp file
+olcConsooleGameEngine and cpp file
 
-Generating natural terrain from randomly picked numbers that are the terrain seed.
+In this code we're going to generate Perlin Noise, natural terrain from randomly picked numbers that are the terrain seed. </br>
+Scientist by the name Ken Perlin came up with an algorithm which generates noise that looks natural to us.
