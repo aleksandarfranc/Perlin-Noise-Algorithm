@@ -1,216 +1,276 @@
 #include <iostream>
 #include <string>
-#include <math.h>
+#include <algorithm>
 
 using namespace std;
 
 #include "olcConsoleGameEngine.h"
 
 
-class OneLoneCoder_PerlinNoiseDemo : public olcConsoleGameEngine
- {
-public:
-
-	OneLoneCoder_PerlinNoiseDemo() 
-	{
-		m_sAppName = L"Perlin Noise";
-	}
+class PerlinNoise : public olcConsoleGameEngine
+{
 private:
-
+	int* nMap;
+	int nWidth;
+	int nHeight;
+	float fBias = 2.0f;
 	int nOctave = 1;
-	float fScalingBias = 2.0f;
-
-	int nMode = 2;
+	int nMode = 1;
 
 	// 1D variables
-	float* fNoiseSeed1D = nullptr;
-	float* fPerlinNoise1D = nullptr;
-	int nOutputSize = 256;
+	float* fSeed1D = nullptr;
+	float* fNoise1D = nullptr;
 
-	// 2D variables
-	float* fNoiseSeed2D = nullptr;
-	float* fPerlinNoise2D = nullptr;
-	int nOutputWidth = 256;
-	int nOutputHeight = 256;
+	// 2d Variables
+	float* fSeed2D = nullptr;
+	float* fNoise2D = nullptr;
 
-	virtual bool OnUserCreate()
+public:
+
+	bool OnUserCreate()
 	{
-		// 1D
-		nOutputSize = ScreenWidth();
-		fNoiseSeed1D = new float[nOutputSize];
-		fPerlinNoise1D = new float[nOutputSize];
+		nWidth = ScreenWidth();
+		nHeight = ScreenHeight();
+		nMap = new int[nWidth * nHeight];
+		memset(nMap, 0, nWidth * nHeight * sizeof(int));
 
-		for (int i = 0; i < nOutputSize; i++) {
-			fNoiseSeed1D[i] = (float)rand() / (float)RAND_MAX;
-		}
+		// 1D variables
+		fSeed1D = new float[nWidth];
+		fNoise1D = new float[nWidth];
 
-		nOutputWidth = ScreenWidth();
-		nOutputHeight = ScreenHeight();
-		fNoiseSeed2D = new float[nOutputWidth * nOutputHeight];
-		fPerlinNoise2D = new float[nOutputWidth * nOutputHeight];
+		for (int i = 0; i < nWidth; i++)
+			fSeed1D[i] = (float)rand() / (float)RAND_MAX;
 
-		for(int i = 0 ; i < nOutputWidth * nOutputHeight; i++) fNoiseSeed2D[i] = (float)rand() / (float)RAND_MAX;
+		// 2D variables
+		fSeed2D = new float[nWidth * nHeight];
+		fNoise2D = new float[nWidth * nHeight];
+
+		for (int i = 0; i < nWidth * nHeight; i++)
+			fSeed2D[i] = (float)rand() / (float)RAND_MAX;
+
 
 		return true;
 	}
 
-	virtual bool OnUserUpdate(float fElapsedTime)
+	void PerlinNoise1D(float* fSeed, int nWidth, int nOctave, float fBias, float* fOutput)
 	{
-		Fill(0, 0, ScreenWidth(), ScreenHeight(), L' ');
-	
-		if (m_keys[VK_SPACE].bReleased)
-			nOctave++;
 
-		if (m_keys[VK_UP].bReleased)
-			fScalingBias -= 0.2f;
+		for (int i = 0; i < nWidth; i++)
+		{
+			float fNoise = 0.0f;
+			float fScale = 1.0f;
+			float fScaleAcc = 0.0f;
+			for (int o = 0; o < nOctave; o++)
+			{
+				int nPitch = nWidth >> o;
+				int nSample1 = (i / nPitch) * nPitch;
+				int nSample2 = (nSample1 + nPitch) % nWidth;
+				
+				float fGrowth = (fSeed[nSample2] - fSeed[nSample1]) / nPitch;
+				fNoise += (fSeed[nSample1] + fGrowth * (float)(i - nSample1)) * fScale;
+				fScaleAcc += fScale;
+				fScale /= fBias;
+			}
+			fOutput[i] = fNoise / fScaleAcc;
+		}
+	}
 
-		if (m_keys[VK_DOWN].bReleased)
-			fScalingBias += 0.2f;
-
-		if (m_keys[L'1'].bReleased)
+	bool OnUserUpdate(float fElapsedTime) 
+	{
+		if (m_keys[L'1'].bPressed)
 			nMode = 1;
 
-		if (m_keys[L'2'].bReleased)
+		if (m_keys[L'2'].bPressed)
 			nMode = 2;
 
-		// --------------------------------
 
-		if (fScalingBias < 0.2f)
-			fScalingBias = 2.0f;
+		if (m_keys[VK_UP].bPressed)
+		{
+			nOctave++;
+			if (nOctave > 8)
+				nOctave = 8;
+		}
 
-		if (fScalingBias > 3.2f)
-			fScalingBias = 2.0f;
+		if (m_keys[VK_DOWN].bPressed)
+		{
+			nOctave--;
+			if (nOctave < 1)
+				nOctave = 1;
+		}
 
-		if (nOctave > 8)
-			nOctave = 1;
-		
+		if (m_keys[VK_LEFT].bPressed)
+		{
+			fBias -= 0.2f;
+			if (fBias < 0.4f)
+				fBias = 0.4f;
+		}
 
-		// mode 1D
-		if (nMode == 1) {
-			if (m_keys[L'Z'].bReleased)
-				for (int i = 0; i < nOutputSize; i++)fNoiseSeed1D[i] = (float)rand() / (float)RAND_MAX;
+		if (m_keys[VK_RIGHT].bPressed)
+		{
+			fBias += 0.2f;
+			if (fBias > 2.4f)
+				fBias = 2.4f;;
+		}
 
-			PerlinNoisevezba(fNoiseSeed1D, nOutputSize, nOctave, fScalingBias, fPerlinNoise1D); // ovo nije efikasno jer se poziva f-ja svakog frejma ali zbog ovoga je moguce imati dinamicko menjaje terena
 
-			for (int x = 0; x < nOutputSize; x++) {
-				int y = -fPerlinNoise1D[x] * ScreenHeight() / 2 + ScreenHeight() / 2;
+		// 1D mode
+		if (nMode == 1) 
+		{
 
-				for (int j = y; j < ScreenHeight() / 2; j++)
-					Draw(x, j, PIXEL_SOLID, FG_GREEN);
+			if (m_keys[L'N'].bPressed)
+				for (int i = 0; i < nWidth; i++)
+					fSeed1D[i] = (float)rand() / (float)RAND_MAX;
+
+			if (m_keys[L'X'].bPressed)
+				for (int i = 0; i < nWidth; i++)
+					fSeed1D[i] = 2 * ((float)rand() / (float)RAND_MAX) - 1.0f;
+
+
+
+			PerlinNoise1D(fSeed1D, nWidth, nOctave, fBias, fNoise1D);
+			memset(nMap, 0, sizeof(int) * nWidth * nHeight);
+
+			// fill the map with zeros, ones and twos
+			for (int i = 0; i < nWidth; i++)
+			{
+				int y = (float)nHeight / 2.0f - fNoise1D[i] * (float)nHeight /2.0f;
+				if (y < nHeight / 2.0f)
+				{
+					for (int j = 0; j < nHeight / 2; j++)
+						if (j < y)
+							nMap[j * nWidth + i] = 0;
+						else 
+							nMap[j * nWidth + i] = 1;
+				}
+				else
+				{
+					for (int j = nHeight / 2; j < nHeight; j++)
+						if (j < y)
+							nMap[j * nWidth + i] = 2;
+						else
+							nMap[j * nWidth + i] = 0;
+				}
+			}
+
+			// draw terrain
+			for (int x = 0; x < nWidth; x++)
+				for(int y = 0; y < nHeight; y++)
+			{
+				switch (nMap[y*nWidth + x])
+				{
+				case 1:
+					Draw(x, y, PIXEL_SOLID, FG_GREEN);
+					break;
+				case 2:
+					Draw(x, y, PIXEL_SOLID, FG_RED);
+					break;
+				case 0:
+					Draw(x, y, PIXEL_SOLID, FG_BLACK);
+					break;
+				}
 			}
 		}
 
-		// mode 2D
-		if (nMode == 2) {
-			if (m_keys[L'Z'].bReleased)
-				for (int i = 0; i < nOutputWidth * nOutputHeight; i++) fNoiseSeed2D[i] = (float)rand() / (float)RAND_MAX;
+		// 2D mode
+		else if (nMode == 2)
+		{
+			if (m_keys[L'N'].bPressed)
+				for (int i = 0; i < nWidth * nHeight; i++)
+					fSeed2D[i] = (float)rand() / (float)RAND_MAX;
 
-			PerlinNoise2D(nOutputWidth, nOutputHeight,fNoiseSeed2D,nOctave,fScalingBias, fPerlinNoise2D);
+			PerlinNoise2D(fSeed2D, nWidth, nHeight, nOctave, fBias, fNoise2D);
 
-			for(int x = 0; x<nOutputWidth; x++)
-				for (int y = 0; y < nOutputHeight; y++) {
+			// fill the map
+			for (int i = 0; i < nWidth * nHeight; i++)
+			{
+				nMap[i] = 16 * fNoise2D[i];
+			}
+
+			// draw terrain
+			for (int x = 0; x < nWidth; x++)
+			{
+				for (int y = 0; y < nHeight; y++)
+				{
 					short bg_col, fg_col;
-					wchar_t sym;
-					int pixel_bw = (int)(fPerlinNoise2D[y * nOutputWidth + x] * 12.0f);
-
-					switch (pixel_bw) {
-					case 0: bg_col = BG_BLUE; fg_col = FG_BLUE; sym = PIXEL_SOLID; break;
-
-					case 1: bg_col = BG_BLUE; fg_col = FG_WHITE; sym = PIXEL_QUARTER; break;
-					case 2: bg_col = BG_BLUE; fg_col = FG_WHITE; sym = PIXEL_HALF; break;
-					case 3: bg_col = BG_BLUE; fg_col = FG_WHITE; sym = PIXEL_THREEQUARTERS; break;
-					case 4: bg_col = BG_BLUE; fg_col = FG_WHITE; sym = PIXEL_SOLID; break;
+					wchar_t pixel;
+					int size = (int) (fNoise2D[y * nWidth + x] * 16.0f);
+					switch (size)
+					{
+						case 0: pixel = PIXEL_SOLID; bg_col = BG_DARK_BLUE; fg_col = FG_DARK_BLUE; break;
 					
-					case 5: bg_col = BG_GREY; fg_col = FG_GREEN; sym = PIXEL_QUARTER; break;
-					case 6: bg_col = BG_GREY; fg_col = FG_GREEN; sym = PIXEL_HALF; break;
-					case 7: bg_col = BG_GREY; fg_col = FG_GREEN; sym = PIXEL_THREEQUARTERS; break;
-					case 8: bg_col = BG_GREY; fg_col = FG_GREEN; sym = PIXEL_SOLID; break;
-					
-					case 9: bg_col = BG_BLACK; fg_col = FG_RED; sym = PIXEL_SOLID; break;
-					case 10: bg_col = BG_BLACK; fg_col = FG_RED; sym = PIXEL_THREEQUARTERS; break;
-					case 11: bg_col = BG_BLACK; fg_col = FG_RED; sym = PIXEL_HALF; break;
-					case 12: bg_col = BG_BLACK; fg_col = FG_RED; sym = PIXEL_QUARTER; break;
+						case 1: pixel = PIXEL_SOLID; bg_col = BG_DARK_BLUE; fg_col = FG_BLUE; break;
+						case 2: pixel = PIXEL_THREEQUARTERS; bg_col = BG_DARK_BLUE; fg_col = FG_BLUE; break;
+						case 3: pixel = PIXEL_HALF; bg_col = BG_DARK_BLUE; fg_col = FG_BLUE; break;
+						case 4: pixel = PIXEL_QUARTER; bg_col = BG_DARK_BLUE; fg_col = FG_BLUE; break;
+
+						case 5: pixel = PIXEL_SOLID; bg_col = BG_BLUE; fg_col = FG_GREEN; break;
+						case 6: pixel = PIXEL_THREEQUARTERS; bg_col = BG_BLUE; fg_col = FG_GREEN; break;
+						case 7: pixel = PIXEL_HALF; bg_col = BG_BLUE; fg_col = FG_GREEN; break;
+						case 8: pixel = PIXEL_QUARTER; bg_col = BG_BLUE; fg_col = FG_GREEN; break;
+
+						case 9: pixel = PIXEL_SOLID; bg_col = BG_GREEN; fg_col = FG_DARK_GREY; break;
+						case 10: pixel = PIXEL_THREEQUARTERS; bg_col = BG_GREEN; fg_col = FG_DARK_GREY; break;
+						case 11: pixel = PIXEL_HALF; bg_col = BG_GREEN; fg_col = FG_DARK_GREY; break;
+						case 12: pixel = PIXEL_QUARTER; bg_col = BG_GREEN; fg_col = FG_DARK_GREY; break;
+
+						case 13: pixel = PIXEL_SOLID; bg_col = BG_DARK_GREY; fg_col = FG_WHITE; break;
+						case 14: pixel = PIXEL_THREEQUARTERS; bg_col = BG_DARK_GREY; fg_col = FG_WHITE; break;
+						case 15: pixel = PIXEL_HALF; bg_col = BG_DARK_GREY; fg_col = FG_WHITE; break;
+						case 16: pixel = PIXEL_QUARTER; bg_col = BG_DARK_GREY; fg_col = FG_WHITE; break;
 					}
-
-					Draw(x, y, sym, fg_col | bg_col);
+					Draw(x, y, pixel, bg_col | fg_col);
 				}
-
+			}
 		}
-
 
 		return true;
 	}
 
-	void PerlinNoisevezba(float* fSeed, int nWidth, int octave, float fBias, float* fPerlin) {
+	void PerlinNoise2D(float* fSeed, int nWidth, int nHeight, int nOctave, float fBias, float* fOutput)
+	{
+		for (int x = 0; x < nWidth; x++)
+		{
+			for (int y = 0; y < nHeight; y++)
+			{
+				float fNoise = 0.0f;
+				float fScale = 1.0f;
+				float fScaleAcc = 0.0f;
+				for (int o = 0; o < nOctave; o++)
+				{
+					int nPitch = nWidth >> o;
+					int nSample1X = (x / nPitch) * nPitch;
+					int nSample2X = (nSample1X + nPitch) % nWidth;
 
-		for (int i = 0; i < nWidth; i++) {
+					int nSample1Y = (y / nPitch) * nPitch;
+					int nSample2Y = (nSample1Y + nPitch) % nWidth;
 
-			float fScaling = 1.0f;
-			float fScalingSum = 0.0f;
-			float between = 0.0f;
+					float fGrowthX = (fSeed[nSample1Y * nWidth + nSample2X] - fSeed[nSample1Y * nWidth + nSample1X]) / (float)nPitch;
+					float fGrowthY = (fSeed[nSample2Y * nWidth + nSample2X] - fSeed[nSample2Y * nWidth + nSample1X]) / (float)nPitch;
 
-			for (int j = 0; j < octave; j++) {
-				int nDots = nWidth >> j; // 256,128,64,32,16,8,4,2,1,0
-				int lower = ((i / nDots) * nDots) % nWidth; // 0; 0, 128; 0,64,128,196;...  
-				int upper = (lower + nDots) % nWidth; // 0; 128, 0; 64,128,196,0; ...
+					float fNoiseX = (fSeed[nSample1Y * nWidth + nSample1X] + fGrowthX * (float)(x - nSample1X));
+					float fNoiseY = (fSeed[nSample2Y * nWidth + nSample1X] + fGrowthY * (float)(x - nSample1X));
 
-				float left = fSeed[lower] * fScaling;
-				float right = fSeed[upper] * fScaling;
+					float fGrowthXY = (fNoiseY - fNoiseX) / (float)nPitch;
+					fNoise += (fNoiseX + fGrowthXY * (float)(y - nSample1Y)) * fScale;
 
-				float offset = (float)(i - lower) / (float)nDots;
-
-				between += left - (left - right) * offset;
-
-				fScalingSum += fScaling;
-				fScaling /= fBias;
-			}
-
-			fPerlin[i] = between / fScalingSum; fScaling = 1.0f;
-		}
-	}
-
-	void PerlinNoise2D(int nWidth, int nHeight, float* fNoiseSeed2D, int nOctave, float fBias, float* fPerlinNoise2D) {
-		for (int x = 0; x < nWidth; x++) {
-			for (int y = 0; y < nHeight; y++) {
-				float fScaling = 1.0f;
-				float fSumScaling = 0.0f;
-				float Noise = 0.0f;
-
-				for (int o = 0; o < nOctave; o++) {
-					int indexX = nWidth >> o;
-
-					int indexLeftX = (x / indexX) * indexX % nWidth;
-					int indexRightX = (indexLeftX + indexX) % nWidth;
-
-					int indexDownY = (y / indexX) * indexX % nWidth;
-					int indexUpY = (indexDownY + indexX) % nWidth;
-
-					float offsetX = float(x - indexLeftX) / (float)indexX;
-					float offsetY = float(y - indexDownY) / (float)indexX;
-
-					float SampleDownX = (1.0f - offsetX) * fNoiseSeed2D[indexDownY * nWidth + indexLeftX] + offsetX * fNoiseSeed2D[indexDownY * nWidth + indexRightX];
-					float SampleUpX = (1.0f - offsetX) * fNoiseSeed2D[indexUpY * nWidth + indexLeftX] + offsetX * fNoiseSeed2D[indexUpY * nWidth + indexRightX];
-
-					Noise += ((1.0f - offsetY) * SampleDownX + offsetY * SampleUpX) * fScaling;
-					fSumScaling += fScaling;
-					fScaling /= fBias;
+					fScaleAcc += fScale;
+					fScale /= fBias;
 				}
-
-				fPerlinNoise2D[y * nWidth + x] = Noise / fSumScaling;
+				fOutput[y * nWidth + x] = fNoise / fScaleAcc;
 			}
-
 		}
-
-		
 	}
 };
 
 
+
+
 int main() {
 
-	OneLoneCoder_PerlinNoiseDemo game;
+	PerlinNoise game;
 	game.ConstructConsole(256, 256, 2, 2);
 	game.Start();
 
+	system("pause");
 	return 0;
 }
